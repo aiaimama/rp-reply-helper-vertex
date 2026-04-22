@@ -7,30 +7,44 @@ module.exports = async function handler(req, res) {
 
   try {
     const {
-      projectId,
-      clientEmail,
-      privateKey,
+      serviceAccountJson,
       modelName,
       charOutput,
       userInput,
       replyLength
     } = req.body || {};
 
-    if (!projectId) {
-      return res.status(400).json({ error: "Google Cloud Project ID가 없습니다." });
-    }
-
-    if (!clientEmail) {
-      return res.status(400).json({ error: "Service Account Email이 없습니다." });
-    }
-
-    if (!privateKey) {
-      return res.status(400).json({ error: "Vertex Private Key가 없습니다." });
+    if (!serviceAccountJson) {
+      return res.status(400).json({ error: "Service Account JSON이 없습니다." });
     }
 
     if (!userInput) {
       return res.status(400).json({ error: "내가 쓴 인풋을 먼저 입력해주세요." });
     }
+
+    let credentials;
+
+    try {
+      credentials = JSON.parse(serviceAccountJson);
+    } catch (error) {
+      return res.status(400).json({ error: "Service Account JSON 형식이 올바르지 않습니다." });
+    }
+
+    if (!credentials.project_id) {
+      return res.status(400).json({ error: "Service Account JSON에 project_id가 없습니다." });
+    }
+
+    if (!credentials.client_email) {
+      return res.status(400).json({ error: "Service Account JSON에 client_email이 없습니다." });
+    }
+
+    if (!credentials.private_key) {
+      return res.status(400).json({ error: "Service Account JSON에 private_key가 없습니다." });
+    }
+
+    credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
+
+    const projectId = credentials.project_id;
 
     const allowedModels = [
       "gemini-3.1-pro-preview",
@@ -42,18 +56,6 @@ module.exports = async function handler(req, res) {
     const selectedModel = allowedModels.includes(modelName)
       ? modelName
       : "gemini-3-flash-preview";
-
-    const normalizedPrivateKey = privateKey.includes("\\n")
-      ? privateKey.replace(/\\n/g, "\n")
-      : privateKey;
-
-    const credentials = {
-      type: "service_account",
-      project_id: projectId,
-      private_key: normalizedPrivateKey,
-      client_email: clientEmail,
-      token_uri: "https://oauth2.googleapis.com/token"
-    };
 
     const targetLength = replyLength === "short" ? "500자 내외" : "1000자 내외";
     const lengthRule =
