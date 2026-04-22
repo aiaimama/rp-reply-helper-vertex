@@ -34,7 +34,8 @@
     }
 
     textarea,
-    select {
+    select,
+    input {
       width: 100%;
       box-sizing: border-box;
       border: 1px solid #c9c2b8;
@@ -51,9 +52,28 @@
       resize: vertical;
     }
 
-    select {
+    select,
+    input {
       min-height: 44px;
       padding: 0 12px;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+
+    .checkbox-row label {
+      margin: 0;
+      font-weight: 500;
+    }
+
+    .checkbox-row input {
+      width: 18px;
+      height: 18px;
     }
 
     .buttons {
@@ -133,6 +153,40 @@
     <h1>롤플 답변 도우미</h1>
 
     <section>
+      <label for="projectId">Google Cloud Project ID</label>
+      <input
+        id="projectId"
+        type="text"
+        placeholder="my-google-cloud-project"
+        autocomplete="off"
+      />
+    </section>
+
+    <section>
+      <label for="location">Location</label>
+      <input
+        id="location"
+        type="text"
+        value="global"
+        placeholder="global"
+        autocomplete="off"
+      />
+    </section>
+
+    <section>
+      <label for="serviceAccountJson">Service Account JSON</label>
+      <textarea
+        id="serviceAccountJson"
+        placeholder='{"type":"service_account","project_id":"..."}'
+      ></textarea>
+
+      <div class="checkbox-row">
+        <input id="saveVertexAuth" type="checkbox" />
+        <label for="saveVertexAuth">이 기기에 Vertex 인증 정보 저장</label>
+      </div>
+    </section>
+
+    <section>
       <label for="modelName">모델</label>
       <select id="modelName">
         <option value="gemini-3.1-pro-preview">Gemini Pro 3.1 Preview Vertex</option>
@@ -187,6 +241,52 @@
   </main>
 
   <script>
+    const VERTEX_AUTH_STORAGE_KEY = "rpReplyHelperVertexAuth";
+
+    window.addEventListener("DOMContentLoaded", function() {
+      const savedAuth = localStorage.getItem(VERTEX_AUTH_STORAGE_KEY);
+      const saveVertexAuth = document.getElementById("saveVertexAuth");
+
+      if (savedAuth) {
+        try {
+          const parsed = JSON.parse(savedAuth);
+
+          document.getElementById("projectId").value = parsed.projectId || "";
+          document.getElementById("location").value = parsed.location || "global";
+          document.getElementById("serviceAccountJson").value = parsed.serviceAccountJson || "";
+          saveVertexAuth.checked = true;
+        } catch (error) {
+          localStorage.removeItem(VERTEX_AUTH_STORAGE_KEY);
+        }
+      }
+
+      saveVertexAuth.addEventListener("change", function() {
+        if (saveVertexAuth.checked) {
+          saveAuthToLocalStorage();
+        } else {
+          localStorage.removeItem(VERTEX_AUTH_STORAGE_KEY);
+        }
+      });
+
+      ["projectId", "location", "serviceAccountJson"].forEach(function(id) {
+        document.getElementById(id).addEventListener("input", function() {
+          if (saveVertexAuth.checked) {
+            saveAuthToLocalStorage();
+          }
+        });
+      });
+    });
+
+    function saveAuthToLocalStorage() {
+      const authData = {
+        projectId: document.getElementById("projectId").value.trim(),
+        location: document.getElementById("location").value.trim() || "global",
+        serviceAccountJson: document.getElementById("serviceAccountJson").value.trim()
+      };
+
+      localStorage.setItem(VERTEX_AUTH_STORAGE_KEY, JSON.stringify(authData));
+    }
+
     function showStatus(message) {
       const statusMessage = document.getElementById("statusMessage");
       statusMessage.textContent = message;
@@ -215,6 +315,10 @@
     }
 
     async function makeEditedReply() {
+      const projectId = document.getElementById("projectId").value.trim();
+      const location = document.getElementById("location").value.trim() || "global";
+      const serviceAccountJson = document.getElementById("serviceAccountJson").value.trim();
+      const saveVertexAuth = document.getElementById("saveVertexAuth").checked;
       const modelName = document.getElementById("modelName").value;
       const charOutput = document.getElementById("charOutput").value.trim();
       const userInput = document.getElementById("userInput").value.trim();
@@ -225,6 +329,27 @@
 
       showStatus("");
       showTokenInfo(null);
+
+      if (saveVertexAuth) {
+        saveAuthToLocalStorage();
+      }
+
+      if (!projectId) {
+        editedReply.value = "Google Cloud Project ID를 입력해주세요.";
+        return;
+      }
+
+      if (!serviceAccountJson) {
+        editedReply.value = "Service Account JSON을 입력해주세요.";
+        return;
+      }
+
+      try {
+        JSON.parse(serviceAccountJson);
+      } catch (error) {
+        editedReply.value = "Service Account JSON 형식이 올바르지 않습니다.";
+        return;
+      }
 
       if (!charOutput && !userInput) {
         editedReply.value = "Char의 아웃풋과 내 인풋을 먼저 입력해주세요.";
@@ -249,6 +374,9 @@
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
+            projectId,
+            location,
+            serviceAccountJson,
             modelName,
             charOutput,
             userInput,
@@ -308,4 +436,3 @@
   </script>
 </body>
 </html>
-
