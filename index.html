@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>롤플 답변 도우미</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f3ef;
+      color: #222;
+    }
+
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin: 0 0 18px;
+    }
+
+    section {
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    textarea,
+    select {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #c9c2b8;
+      border-radius: 8px;
+      font-size: 16px;
+      background: #fffdf9;
+      color: #222;
+    }
+
+    textarea {
+      min-height: 150px;
+      padding: 14px;
+      line-height: 1.5;
+      resize: vertical;
+    }
+
+    select {
+      min-height: 44px;
+      padding: 0 12px;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    button {
+      min-height: 44px;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      background: #2f5d50;
+      color: white;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #6c6259;
+    }
+
+    button.danger {
+      background: #8a3d35;
+    }
+
+    button:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .status-message {
+      min-height: 22px;
+      margin-top: 8px;
+      font-size: 14px;
+      color: #2f5d50;
+      font-weight: 700;
+    }
+
+    @media (max-width: 520px) {
+      body {
+        padding: 14px;
+      }
+
+      h1 {
+        font-size: 21px;
+      }
+
+      textarea {
+        min-height: 140px;
+      }
+
+      button {
+        width: 100%;
+      }
+
+      .buttons {
+        align-items: stretch;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>롤플 답변 도우미</h1>
+
+    <section>
+      <label for="modelName">모델</label>
+      <select id="modelName">
+        <option value="gemini-3.1-pro-preview">Gemini Pro 3.1 Preview Vertex</option>
+        <option value="gemini-3-flash-preview">Gemini Flash 3 Preview Vertex</option>
+        <option value="gemini-2.5-pro">Gemini Pro 2.5 Vertex</option>
+        <option value="gemini-2.5-flash">Gemini Flash 2.5 Vertex</option>
+      </select>
+    </section>
+
+    <section>
+      <label for="charOutput">Char의 아웃풋</label>
+      <textarea
+        id="charOutput"
+        placeholder="상대 캐릭터의 답변을 여기에 붙여넣기"
+      ></textarea>
+    </section>
+
+    <section>
+      <label for="userInput">내가 쓴 인풋</label>
+      <textarea
+        id="userInput"
+        placeholder="내가 쓰고 싶은 답변 초안을 여기에 입력"
+      ></textarea>
+    </section>
+
+    <section>
+      <label for="replyLength">답변 길이</label>
+      <select id="replyLength">
+        <option value="short">짧게 - 500자 내외</option>
+        <option value="long">길게 - 1000자 내외</option>
+      </select>
+    </section>
+
+    <section>
+      <label for="editedReply">수정된 답변</label>
+      <textarea
+        id="editedReply"
+        placeholder="수정된 답변이 여기에 표시됩니다."
+      ></textarea>
+
+      <div class="buttons">
+        <button id="makeButton" type="button" onclick="makeEditedReply()">답변 만들기</button>
+        <button id="remakeButton" type="button" class="secondary" onclick="makeEditedReply()">다시 만들기</button>
+        <button type="button" class="secondary" onclick="copyEditedReply()">복사하기</button>
+        <button type="button" class="danger" onclick="clearAll()">전체 지우기</button>
+      </div>
+
+      <div id="statusMessage" class="status-message"></div>
+    </section>
+  </main>
+
+  <script>
+    function showStatus(message) {
+      const statusMessage = document.getElementById("statusMessage");
+      statusMessage.textContent = message;
+
+      if (message) {
+        setTimeout(function() {
+          if (statusMessage.textContent === message) {
+            statusMessage.textContent = "";
+          }
+        }, 1800);
+      }
+    }
+
+    async function makeEditedReply() {
+      const modelName = document.getElementById("modelName").value;
+      const charOutput = document.getElementById("charOutput").value.trim();
+      const userInput = document.getElementById("userInput").value.trim();
+      const replyLength = document.getElementById("replyLength").value;
+      const editedReply = document.getElementById("editedReply");
+      const makeButton = document.getElementById("makeButton");
+      const remakeButton = document.getElementById("remakeButton");
+
+      showStatus("");
+
+      if (!charOutput && !userInput) {
+        editedReply.value = "Char의 아웃풋과 내 인풋을 먼저 입력해주세요.";
+        return;
+      }
+
+      if (!userInput) {
+        editedReply.value = "내가 쓴 인풋을 먼저 입력해주세요.";
+        return;
+      }
+
+      editedReply.value = "답변을 만드는 중입니다...";
+      makeButton.disabled = true;
+      remakeButton.disabled = true;
+      makeButton.textContent = "생성 중";
+      remakeButton.textContent = "생성 중";
+
+      try {
+        const response = await fetch("/api/rewrite", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            modelName,
+            charOutput,
+            userInput,
+            replyLength
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          editedReply.value = data.error || "요청 중 오류가 발생했습니다.";
+          return;
+        }
+
+        if (data.finishReason && data.finishReason !== "STOP") {
+          editedReply.value =
+            (data.text || "") +
+            "\n\n[알림: 응답이 중간에 멈췄을 수 있습니다. finishReason: " +
+            data.finishReason +
+            "]";
+          return;
+        }
+
+        editedReply.value = data.text || "응답을 가져오지 못했습니다.";
+      } catch (error) {
+        editedReply.value =
+          "요청에 실패했습니다. Vercel API 또는 Vertex AI 설정을 확인해주세요.";
+      } finally {
+        makeButton.disabled = false;
+        remakeButton.disabled = false;
+        makeButton.textContent = "답변 만들기";
+        remakeButton.textContent = "다시 만들기";
+      }
+    }
+
+    async function copyEditedReply() {
+      const text = document.getElementById("editedReply").value.trim();
+
+      if (!text) {
+        showStatus("복사할 답변이 없습니다.");
+        return;
+      }
+
+      await navigator.clipboard.writeText(text);
+      showStatus("복사되었습니다.");
+    }
+
+    function clearAll() {
+      document.getElementById("charOutput").value = "";
+      document.getElementById("userInput").value = "";
+      document.getElementById("editedReply").value = "";
+      showStatus("입력 내용을 지웠습니다.");
+    }
+  </script>
+</body>
+</html>
