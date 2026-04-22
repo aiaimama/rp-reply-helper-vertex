@@ -97,6 +97,14 @@
       font-weight: 700;
     }
 
+    .token-info {
+      min-height: 22px;
+      margin-top: 8px;
+      font-size: 13px;
+      color: #6c6259;
+      font-weight: 600;
+    }
+
     @media (max-width: 520px) {
       body {
         padding: 14px;
@@ -165,6 +173,8 @@
         placeholder="수정된 답변이 여기에 표시됩니다."
       ></textarea>
 
+      <div id="tokenInfo" class="token-info"></div>
+
       <div class="buttons">
         <button id="makeButton" type="button" onclick="makeEditedReply()">답변 만들기</button>
         <button id="remakeButton" type="button" class="secondary" onclick="makeEditedReply()">다시 만들기</button>
@@ -190,6 +200,20 @@
       }
     }
 
+    function showTokenInfo(usage) {
+      const tokenInfo = document.getElementById("tokenInfo");
+
+      if (!usage) {
+        tokenInfo.textContent = "";
+        return;
+      }
+
+      tokenInfo.textContent =
+        "입력 " + (usage.promptTokenCount || 0) +
+        " 토큰 / 출력 " + (usage.candidatesTokenCount || 0) +
+        " 토큰 / 전체 " + (usage.totalTokenCount || 0) + " 토큰";
+    }
+
     async function makeEditedReply() {
       const modelName = document.getElementById("modelName").value;
       const charOutput = document.getElementById("charOutput").value.trim();
@@ -200,6 +224,7 @@
       const remakeButton = document.getElementById("remakeButton");
 
       showStatus("");
+      showTokenInfo(null);
 
       if (!charOutput && !userInput) {
         editedReply.value = "Char의 아웃풋과 내 인풋을 먼저 입력해주세요.";
@@ -232,6 +257,8 @@
         });
 
         const data = await response.json();
+
+        showTokenInfo(data.usageMetadata);
 
         if (!response.ok) {
           editedReply.value = data.error || "요청 중 오류가 발생했습니다.";
@@ -275,8 +302,10 @@
       document.getElementById("charOutput").value = "";
       document.getElementById("userInput").value = "";
       document.getElementById("editedReply").value = "";
+      showTokenInfo(null);
       showStatus("입력 내용을 지웠습니다.");
     }
   </script>
 </body>
 </html>
+
