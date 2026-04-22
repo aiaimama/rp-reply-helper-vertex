@@ -163,21 +163,20 @@
     </section>
 
     <section>
-      <label for="location">Location</label>
+      <label for="clientEmail">Service Account Email</label>
       <input
-        id="location"
+        id="clientEmail"
         type="text"
-        value="global"
-        placeholder="global"
+        placeholder="name@project.iam.gserviceaccount.com"
         autocomplete="off"
       />
     </section>
 
     <section>
-      <label for="serviceAccountJson">Service Account JSON</label>
+      <label for="privateKey">Vertex Private Key</label>
       <textarea
-        id="serviceAccountJson"
-        placeholder='{"type":"service_account","project_id":"..."}'
+        id="privateKey"
+        placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
       ></textarea>
 
       <div class="checkbox-row">
@@ -241,7 +240,7 @@
   </main>
 
   <script>
-    const VERTEX_AUTH_STORAGE_KEY = "rpReplyHelperVertexAuth";
+    const VERTEX_AUTH_STORAGE_KEY = "rpReplyHelperVertexAuthFields";
 
     window.addEventListener("DOMContentLoaded", function() {
       const savedAuth = localStorage.getItem(VERTEX_AUTH_STORAGE_KEY);
@@ -252,8 +251,8 @@
           const parsed = JSON.parse(savedAuth);
 
           document.getElementById("projectId").value = parsed.projectId || "";
-          document.getElementById("location").value = parsed.location || "global";
-          document.getElementById("serviceAccountJson").value = parsed.serviceAccountJson || "";
+          document.getElementById("clientEmail").value = parsed.clientEmail || "";
+          document.getElementById("privateKey").value = parsed.privateKey || "";
           saveVertexAuth.checked = true;
         } catch (error) {
           localStorage.removeItem(VERTEX_AUTH_STORAGE_KEY);
@@ -268,7 +267,7 @@
         }
       });
 
-      ["projectId", "location", "serviceAccountJson"].forEach(function(id) {
+      ["projectId", "clientEmail", "privateKey"].forEach(function(id) {
         document.getElementById(id).addEventListener("input", function() {
           if (saveVertexAuth.checked) {
             saveAuthToLocalStorage();
@@ -280,8 +279,8 @@
     function saveAuthToLocalStorage() {
       const authData = {
         projectId: document.getElementById("projectId").value.trim(),
-        location: document.getElementById("location").value.trim() || "global",
-        serviceAccountJson: document.getElementById("serviceAccountJson").value.trim()
+        clientEmail: document.getElementById("clientEmail").value.trim(),
+        privateKey: document.getElementById("privateKey").value.trim()
       };
 
       localStorage.setItem(VERTEX_AUTH_STORAGE_KEY, JSON.stringify(authData));
@@ -316,8 +315,8 @@
 
     async function makeEditedReply() {
       const projectId = document.getElementById("projectId").value.trim();
-      const location = document.getElementById("location").value.trim() || "global";
-      const serviceAccountJson = document.getElementById("serviceAccountJson").value.trim();
+      const clientEmail = document.getElementById("clientEmail").value.trim();
+      const privateKey = document.getElementById("privateKey").value.trim();
       const saveVertexAuth = document.getElementById("saveVertexAuth").checked;
       const modelName = document.getElementById("modelName").value;
       const charOutput = document.getElementById("charOutput").value.trim();
@@ -339,15 +338,18 @@
         return;
       }
 
-      if (!serviceAccountJson) {
-        editedReply.value = "Service Account JSON을 입력해주세요.";
+      if (!clientEmail) {
+        editedReply.value = "Service Account Email을 입력해주세요.";
         return;
       }
 
-      try {
-        JSON.parse(serviceAccountJson);
-      } catch (error) {
-        editedReply.value = "Service Account JSON 형식이 올바르지 않습니다.";
+      if (!privateKey) {
+        editedReply.value = "Vertex Private Key를 입력해주세요.";
+        return;
+      }
+
+      if (!privateKey.includes("BEGIN PRIVATE KEY") || !privateKey.includes("END PRIVATE KEY")) {
+        editedReply.value = "Vertex Private Key 형식이 올바르지 않습니다.";
         return;
       }
 
@@ -375,8 +377,8 @@
           },
           body: JSON.stringify({
             projectId,
-            location,
-            serviceAccountJson,
+            clientEmail,
+            privateKey,
             modelName,
             charOutput,
             userInput,
