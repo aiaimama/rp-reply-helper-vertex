@@ -34,8 +34,7 @@
     }
 
     textarea,
-    select,
-    input {
+    select {
       width: 100%;
       box-sizing: border-box;
       border: 1px solid #c9c2b8;
@@ -52,8 +51,7 @@
       resize: vertical;
     }
 
-    select,
-    input {
+    select {
       min-height: 44px;
       padding: 0 12px;
     }
@@ -153,30 +151,10 @@
     <h1>롤플 답변 도우미</h1>
 
     <section>
-      <label for="projectId">Google Cloud Project ID</label>
-      <input
-        id="projectId"
-        type="text"
-        placeholder="my-google-cloud-project"
-        autocomplete="off"
-      />
-    </section>
-
-    <section>
-      <label for="clientEmail">Service Account Email</label>
-      <input
-        id="clientEmail"
-        type="text"
-        placeholder="name@project.iam.gserviceaccount.com"
-        autocomplete="off"
-      />
-    </section>
-
-    <section>
-      <label for="privateKey">Vertex Private Key</label>
+      <label for="serviceAccountJson">Service Account JSON</label>
       <textarea
-        id="privateKey"
-        placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
+        id="serviceAccountJson"
+        placeholder='{"type":"service_account","project_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"..."}'
       ></textarea>
 
       <div class="checkbox-row">
@@ -240,51 +218,32 @@
   </main>
 
   <script>
-    const VERTEX_AUTH_STORAGE_KEY = "rpReplyHelperVertexAuthFields";
+    const VERTEX_AUTH_STORAGE_KEY = "rpReplyHelperVertexServiceAccountJson";
 
     window.addEventListener("DOMContentLoaded", function() {
-      const savedAuth = localStorage.getItem(VERTEX_AUTH_STORAGE_KEY);
+      const savedJson = localStorage.getItem(VERTEX_AUTH_STORAGE_KEY);
       const saveVertexAuth = document.getElementById("saveVertexAuth");
+      const serviceAccountJson = document.getElementById("serviceAccountJson");
 
-      if (savedAuth) {
-        try {
-          const parsed = JSON.parse(savedAuth);
-
-          document.getElementById("projectId").value = parsed.projectId || "";
-          document.getElementById("clientEmail").value = parsed.clientEmail || "";
-          document.getElementById("privateKey").value = parsed.privateKey || "";
-          saveVertexAuth.checked = true;
-        } catch (error) {
-          localStorage.removeItem(VERTEX_AUTH_STORAGE_KEY);
-        }
+      if (savedJson) {
+        serviceAccountJson.value = savedJson;
+        saveVertexAuth.checked = true;
       }
 
       saveVertexAuth.addEventListener("change", function() {
         if (saveVertexAuth.checked) {
-          saveAuthToLocalStorage();
+          localStorage.setItem(VERTEX_AUTH_STORAGE_KEY, serviceAccountJson.value.trim());
         } else {
           localStorage.removeItem(VERTEX_AUTH_STORAGE_KEY);
         }
       });
 
-      ["projectId", "clientEmail", "privateKey"].forEach(function(id) {
-        document.getElementById(id).addEventListener("input", function() {
-          if (saveVertexAuth.checked) {
-            saveAuthToLocalStorage();
-          }
-        });
+      serviceAccountJson.addEventListener("input", function() {
+        if (saveVertexAuth.checked) {
+          localStorage.setItem(VERTEX_AUTH_STORAGE_KEY, serviceAccountJson.value.trim());
+        }
       });
     });
-
-    function saveAuthToLocalStorage() {
-      const authData = {
-        projectId: document.getElementById("projectId").value.trim(),
-        clientEmail: document.getElementById("clientEmail").value.trim(),
-        privateKey: document.getElementById("privateKey").value.trim()
-      };
-
-      localStorage.setItem(VERTEX_AUTH_STORAGE_KEY, JSON.stringify(authData));
-    }
 
     function showStatus(message) {
       const statusMessage = document.getElementById("statusMessage");
@@ -314,9 +273,7 @@
     }
 
     async function makeEditedReply() {
-      const projectId = document.getElementById("projectId").value.trim();
-      const clientEmail = document.getElementById("clientEmail").value.trim();
-      const privateKey = document.getElementById("privateKey").value.trim();
+      const serviceAccountJson = document.getElementById("serviceAccountJson").value.trim();
       const saveVertexAuth = document.getElementById("saveVertexAuth").checked;
       const modelName = document.getElementById("modelName").value;
       const charOutput = document.getElementById("charOutput").value.trim();
@@ -330,26 +287,23 @@
       showTokenInfo(null);
 
       if (saveVertexAuth) {
-        saveAuthToLocalStorage();
+        localStorage.setItem(VERTEX_AUTH_STORAGE_KEY, serviceAccountJson);
       }
 
-      if (!projectId) {
-        editedReply.value = "Google Cloud Project ID를 입력해주세요.";
+      if (!serviceAccountJson) {
+        editedReply.value = "Service Account JSON을 입력해주세요.";
         return;
       }
 
-      if (!clientEmail) {
-        editedReply.value = "Service Account Email을 입력해주세요.";
-        return;
-      }
+      try {
+        const parsed = JSON.parse(serviceAccountJson);
 
-      if (!privateKey) {
-        editedReply.value = "Vertex Private Key를 입력해주세요.";
-        return;
-      }
-
-      if (!privateKey.includes("BEGIN PRIVATE KEY") || !privateKey.includes("END PRIVATE KEY")) {
-        editedReply.value = "Vertex Private Key 형식이 올바르지 않습니다.";
+        if (!parsed.project_id || !parsed.client_email || !parsed.private_key) {
+          editedReply.value = "Service Account JSON에 project_id, client_email, private_key가 필요합니다.";
+          return;
+        }
+      } catch (error) {
+        editedReply.value = "Service Account JSON 형식이 올바르지 않습니다.";
         return;
       }
 
@@ -376,9 +330,7 @@
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            projectId,
-            clientEmail,
-            privateKey,
+            serviceAccountJson,
             modelName,
             charOutput,
             userInput,
@@ -438,3 +390,4 @@
   </script>
 </body>
 </html>
+
