@@ -6,20 +6,30 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { modelName, charOutput, userInput, replyLength } = req.body || {};
+    const {
+      projectId,
+      clientEmail,
+      privateKey,
+      modelName,
+      charOutput,
+      userInput,
+      replyLength
+    } = req.body || {};
+
+    if (!projectId) {
+      return res.status(400).json({ error: "Google Cloud Project ID가 없습니다." });
+    }
+
+    if (!clientEmail) {
+      return res.status(400).json({ error: "Service Account Email이 없습니다." });
+    }
+
+    if (!privateKey) {
+      return res.status(400).json({ error: "Vertex Private Key가 없습니다." });
+    }
 
     if (!userInput) {
       return res.status(400).json({ error: "내가 쓴 인풋을 먼저 입력해주세요." });
-    }
-
-    const projectId = process.env.GOOGLE_CLOUD_PROJECT;
-    const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
-    const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-
-    if (!projectId || !serviceAccountJson) {
-      return res.status(500).json({
-        error: "Vercel 환경변수 GOOGLE_CLOUD_PROJECT 또는 GOOGLE_SERVICE_ACCOUNT_JSON이 없습니다."
-      });
     }
 
     const allowedModels = [
@@ -32,6 +42,18 @@ module.exports = async function handler(req, res) {
     const selectedModel = allowedModels.includes(modelName)
       ? modelName
       : "gemini-3-flash-preview";
+
+    const normalizedPrivateKey = privateKey.includes("\\n")
+      ? privateKey.replace(/\\n/g, "\n")
+      : privateKey;
+
+    const credentials = {
+      type: "service_account",
+      project_id: projectId,
+      private_key: normalizedPrivateKey,
+      client_email: clientEmail,
+      token_uri: "https://oauth2.googleapis.com/token"
+    };
 
     const targetLength = replyLength === "short" ? "500자 내외" : "1000자 내외";
     const lengthRule =
@@ -99,8 +121,6 @@ ${userInput}
 5. 상대방은 오직 {{char}}로만 표기하세요.
 `;
 
-    const credentials = JSON.parse(serviceAccountJson);
-
     const auth = new GoogleAuth({
       credentials,
       scopes: ["https://www.googleapis.com/auth/cloud-platform"]
@@ -112,9 +132,7 @@ ${userInput}
     const url =
       "https://aiplatform.googleapis.com/v1/projects/" +
       projectId +
-      "/locations/" +
-      location +
-      "/publishers/google/models/" +
+      "/locations/global/publishers/google/models/" +
       selectedModel +
       ":generateContent";
 
@@ -156,7 +174,8 @@ ${userInput}
     return res.status(200).json({
       text: text.trim(),
       finishReason: candidate?.finishReason || null,
-      model: selectedModel
+      model: selectedModel,
+      usageMetadata: data.usageMetadata || null
     });
   } catch (error) {
     return res.status(500).json({
